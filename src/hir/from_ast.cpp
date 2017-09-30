@@ -862,7 +862,7 @@ namespace {
         };
 }
 
-::HIR::Enum LowerHIR_Enum(::HIR::ItemPath path, const ::AST::Enum& f)
+::HIR::Enum LowerHIR_Enum(::HIR::ItemPath path, const ::AST::Enum& f, const ::AST::MetaItems& attrs)
 {
     ::std::vector< ::std::pair< ::std::string, ::HIR::Enum::Variant> >  variants;
 
@@ -898,7 +898,33 @@ namespace {
     }
 
     auto repr = ::HIR::Enum::Repr::Rust;
-    // TODO: Get repr from attributes
+
+    if( const auto* attr_repr = attrs.get("repr") )
+    {
+        ASSERT_BUG(Span(), attr_repr->has_sub_items(), "#[repr] attribute malformed, " << *attr_repr);
+        ASSERT_BUG(Span(), attr_repr->items().size() == 1, "#[repr] attribute malformed, " << *attr_repr);
+        ASSERT_BUG(Span(), attr_repr->items()[0].has_noarg(), "#[repr] attribute malformed, " << *attr_repr);
+        const auto& repr_str = attr_repr->items()[0].name();
+        if( repr_str == "C" )
+        {
+            repr = ::HIR::Enum::Repr::C;
+        }
+        else if( repr_str == "u8" )
+        {
+            repr = ::HIR::Enum::Repr::U8;
+        }
+        else if( repr_str == "u16" )
+        {
+            repr = ::HIR::Enum::Repr::U16;
+        }
+        else if( repr_str == "u32" )
+        {
+            repr = ::HIR::Enum::Repr::U32;
+        }
+        else {
+            // TODO: Error?
+        }
+    }
 
     return ::HIR::Enum {
         LowerHIR_GenericParams(f.params(), nullptr),
@@ -1252,7 +1278,7 @@ void _add_mod_val_item(::HIR::Module& mod, ::std::string name, bool is_pub,  ::H
             _add_mod_ns_item( mod,  item.name, item.is_pub, LowerHIR_Struct(item_path, e) );
             ),
         (Enum,
-            _add_mod_ns_item( mod,  item.name, item.is_pub, LowerHIR_Enum(item_path, e) );
+            _add_mod_ns_item( mod,  item.name, item.is_pub, LowerHIR_Enum(item_path, e, item.data.attrs) );
             ),
         (Union,
             _add_mod_ns_item( mod,  item.name, item.is_pub, LowerHIR_Union(item_path, e, item.data.attrs) );
